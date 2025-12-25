@@ -17,7 +17,9 @@
 \usepackage[numbers,square,sort&compress]{natbib}
 
 \title{Bitres: A Decentralized Stablecoin System Collateralized by Bitcoin}
-\author{Invariant Core\\\texttt{invariantcore@gmail.com}\\\url{https://github.com/bitres-labs}}
+\author{Invariant Core\\
+\texttt{invariantcore@gmail.com}\\
+\url{https://www.bitres.org}}
 \date{\today}
 
 \renewcommand{\shorttitle}{Bitres: A Decentralized Stablecoin System Collateralized by Bitcoin}
@@ -343,13 +345,30 @@ It is easy to see that when the total collateral ratio (including BTB liabilitie
 
 \section{Interest Rates}
 
-There are two important interest rates in the Bitres: deposit rate and bond rate. All interest rates described in this section are algorithmic policy variables rather than contractual guarantees. The deposit rate refers to the interest rate for users staking their BTD in the system, similar to bank deposits. The bond rate refers to the interest rate for users staking their BTB in the system, where users can earn staking interest over time.
+There are two important interest rates in the Bitres: deposit rate and bond rate. The deposit rate refers to the interest rate for users staking their BTD in the system. The bond rate refers to the interest rate for users staking their BTB in the system. After users deposit tokens into the system, they can earn staking interest over time according to the applicable rate. All interest rates described in this section are algorithmic policy variables rather than contractual guarantees.
 
 \subsection{Deposit Rate}
 
-The system's initial deposit rate is set to the Federal Reserve's federal funds rate at deployment. Thereafter, the deposit rate will be dynamically adjusted according to the system's collateral ratio to maintain system stability and attractiveness. The adjustment strategy is as follows:
+The deposit rate is determined by the market, with the basic goal of making the stablecoin price as close as possible to the Ideal USD price. The specific strategy is: when BTD's market price is less than IUSD's price and continues to fall, the system raises the deposit rate to increase attractiveness; when BTD's market price is greater than IUSD's price and continues to rise, the system lowers the deposit rate. The ultimate target range for stablecoin price control is 0.99--1.01 IUSD. When the stablecoin price is within this range, the deposit rate remains unchanged.
 
-When the collateral ratio is low, the system will increase the deposit rate to attract more users to deposit BTC to mint more BTD, thereby lowering the cost of BTC in the treasury. Conversely, when the collateral ratio is high, the system will decrease the deposit rate to encourage users to burn BTD to redeem BTC, thereby reducing the proportion of high-cost BTC in the treasury. Adjusting the deposit rate according to the collateral ratio level is essentially the BRS system performing counter-cyclical operations, that is, attracting more BTC into the treasury during bear markets and encouraging users to redeem BTC during bull markets, thereby achieving dynamic adjustment of BTD supply and maintaining the 1 BTD = 1 IUSD peg.
+The specific deposit rate adjustment mechanism is shown in Table~\ref{tab:deposit-rate}.
+
+\begin{table}[h]
+\centering
+\caption{Deposit Rate Policy}
+\label{tab:deposit-rate}
+\begin{tabular}{c|c|c}
+\toprule
+BTD Price Range & Price Movement & Rate Policy \\
+\midrule
+$<$0.99 IUSD & Falling & Raise Rate \\
+$<$0.99 IUSD & Rising & Unchanged \\
+{[0.99 IUSD, 1.01 IUSD]} & Either & Unchanged \\
+$>$1.01 IUSD & Falling & Unchanged \\
+$>$1.01 IUSD & Rising & Lower Rate \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \subsection{Bond Rate}
 
