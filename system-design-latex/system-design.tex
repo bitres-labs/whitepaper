@@ -59,7 +59,7 @@ The system contains a custody module, a minting and redemption module, a paramet
   \item \textbf{Collateral Custody Module}: Stores all WBTC collateral and manages the BTD and BRS inventory accumulated within the system;
   \item \textbf{Minting and Redemption Module}: Responsible for BTC\,$\leftrightarrow$\,BTD exchange, also issues new bond token BTB when collateral is insufficient, and can use governance token BRS stored in the custody module for compensation;
   \item \textbf{Configuration and Oracle Module}: Maintains asset addresses, decentralized price pools, off-chain price sources, interest rates, and price threshold parameters;
-  \item \textbf{Interest Rate Control Module}: Updates the annualized yield rates for BTD and BTB staking, following the federal funds rate and secondary market price respectively;
+  \item \textbf{Interest Rate Control Module}: Updates the annualized yield rates for BTD and BTB staking based on market prices and collateral ratio;
   \item \textbf{Mining Module}: Releases governance tokens according to a four-year halving system and distributes rewards to the ecosystem fund, team, and liquidity providers.
 \end{itemize}
 
@@ -89,10 +89,11 @@ BTC price references both:
 \end{enumerate}
 If the deviation between the two exceeds 1\%, the minting process will terminate directly. The prices of bond and governance tokens are also converted to USD through their respective DEX trading pairs for calculating compensation, interest rates, and buyback amounts.
 
-\subsubsection{Oracle Parameter Solidification Strategy}
-To prevent price manipulation, oracle configuration is fully solidified at deployment:
+\subsubsection{Oracle Parameter Governance Strategy}
+Oracle configuration follows a balanced approach between security and flexibility:
 \begin{itemize}
-  \item \textbf{Immutable Parameters}: Pyth price ID, Redstone data source ID, precision configuration, TWAP enable flag, etc., are never changeable after being set in the constructor.
+  \item \textbf{Governable External Addresses}: External oracle addresses (Chainlink feeds, Pyth, Redstone) and DEX pool addresses are governable to allow upgrades when external systems change. Changes are subject to timelock delay (7 days) and whitelist restrictions.
+  \item \textbf{Immutable Core Logic}: Price ID formats, precision configuration, and calculation algorithms are immutable after deployment.
   \item \textbf{Deviation Threshold Governance}: Price deviation tolerance is governable, but can only be \textit{unidirectionally tightened} (from 1\% to stricter values), and is constrained by cooldown period (1 day) and range limits (0.5\%--5\%).
   \item \textbf{Functional Price Aggregation}: Price calculation logic is encapsulated as a pure function library, including multi-source median calculation, deviation validation, etc., independent of mutable state, ensuring the algorithm is transparent and immutable.
 \end{itemize}
@@ -128,7 +129,7 @@ Use Case & Stable settlement asset pegged to IUSD, used for payments, liquidatio
 After a user deposits 1 WBTC, $Q_{\text{BTD}}$ stablecoins are minted according to the validated price:
 \begin{align}
 Q_{\text{BTD}} &= \frac{ P_{\text{BTC}}}{P_{\text{IUSD}}}. \\
-\text{Fee} &= Q_{\text{BTD}} \times 1\%.
+\text{Fee} &= Q_{\text{BTD}} \times 0.5\%.
 \end{align}
 The fee is additionally minted and not collected from the user, and will be fully transferred to treasury inventory. BTD has no total supply cap; its supply is entirely driven by collateral and interest rate policy.
 
@@ -160,12 +161,9 @@ The BRS used for compensation comes from treasury inventory and is not newly min
 In the initial setup, the system defaults to $P_{\text{BTB,min}} = 0.5\,\text{BTD}$.
 
 \subsection{Staking Interest}
-BTD can earn deposit interest in the staking pool:
-\begin{itemize}
-  \item The annualized rate is updated by the interest rate feed or directly by governance, defaulting to reference the upper limit of the US federal funds target range;
-  \item Interest accumulates per second and is paid to stakers through BTD minting;
-  \item The operator can levy an additional fee rate on interest income (default 10\%, adjustable by governance).
-\end{itemize}
+BTD can earn deposit interest in the staking pool. The deposit rate is determined algorithmically based on BTD's market price relative to IUSD, using a Sigmoid function to achieve smooth transitions. When BTD price falls below the anchor (1 IUSD), higher rates attract deposits; when price rises above the anchor, lower rates discourage excessive supply. See Section~\ref{sec:interest-rates} for detailed formulas and parameters.
+
+Interest accumulates per second and is paid to stakers through BTD minting. The operator can levy an additional fee rate on interest income (default 10\%, adjustable by governance).
 
 \section{BTB: Bond Token}
 \subsection{Token Overview}
@@ -199,29 +197,9 @@ When the collateral ratio recovers to above 100\%, bond holders can exchange sta
 Redemption burns the corresponding BTB until the system returns to exactly 100\% collateralization.
 
 \subsection{Staking Interest Rate Policy}
-The annualized rate for the bond staking pool is adjusted at most once per day, following this interval strategy:
-\begin{center}
-\begin{tabular}{ccc}
-\toprule
-BTB Price (in BTD) & Intraday Price Trend & Policy Action \\
-\midrule
-$<0.99$ & Falling & Increase rate \\
-$<0.99$ & Rising & Maintain rate \\
-$[0.99,1.01]$ & Any & Maintain rate \\
-$>1.01$ & Rising & Decrease rate \\
-$>1.01$ & Falling & Maintain rate \\
-\bottomrule
-\end{tabular}
-\end{center}
+The bond rate is determined algorithmically based on two factors: (1) the system's collateral ratio (CR), which affects the base rate, and (2) BTB's market price relative to BTD, which determines rate adjustments. When $CR \geq 100\%$, BTB can be redeemed 1:1 for BTD, so risk is low. When $CR < 100\%$, BTB cannot be redeemed, so holders bear higher risk and deserve higher compensation through an increased base rate.
 
-\textbf{Adjustment Magnitude Algorithm:} When rate adjustment is needed, the adjustment magnitude equals the daily price change of BTB (expressed in basis points). Specifically:
-\begin{itemize}
-  \item When price $<0.99$ and falling, rate increase magnitude = daily decline;
-  \item When price $>1.01$ and rising, rate decrease magnitude = daily increase.
-\end{itemize}
-For example, if BTB price falls from 1.00 BTD to 0.95 BTD (5\% daily decline), the annualized rate will increase by 5 percentage points (500 basis points). This dynamic adjustment mechanism ensures the rate can promptly respond to market price signals, effectively regulating bond supply and demand.
-
-The system defaults the maximum annualized rate for bond tokens to 20\%, with the rate cap adjustable by the governance module. Interest is distributed by minting BTB.
+Similar to BTD, the rate uses a Sigmoid function for smooth price-based adjustment. When BTB price falls below the anchor (1 BTD), higher rates attract bond holders; when price rises above the anchor, lower rates apply. Interest is distributed by minting BTB. The maximum rate is capped at 20\% to prevent excessive token inflation. See Section~\ref{sec:interest-rates} for detailed formulas and parameters.
 
 \section{BRS: Governance Token}
 \subsection{Token Overview}
@@ -361,9 +339,98 @@ Interest is not implemented by minting additional tokens to user accounts, but a
 Example: User deposits 100 BTD and receives 100 stBTD. After one year (assuming 5\% annual rate), redemption yields 105 BTD, while stBTD quantity remains 100.
 
 \subsubsection{Interest Rates}
+\label{sec:interest-rates}
+Both BTD and BTB interest rates are determined algorithmically using Sigmoid functions based on market prices and an internal base rate that varies with collateral ratio (CR).
+
+\paragraph{Base Rate Formula}
+Both BTD and BTB use a CR-based base rate formula:
+\begin{equation}
+r_{base}(CR) = r_{default} \times (1 + \Delta_{CR})
+\end{equation}
+
+Where $r_{default} = 5\%$ is the governance-adjustable default rate (anchor point when CR = 100\%).
+
+The $\Delta_{CR}$ adjustment factor varies by CR:
+\begin{equation}
+\Delta_{CR} = \begin{cases}
+-0.6 \times \dfrac{CR - 1}{0.5} & CR > 1 \quad \text{(rate decreases)} \\[0.5em]
+0 & CR = 1 \quad \text{(anchor point)} \\[0.5em]
+\dfrac{1 - CR}{0.8} \times k & 0.2 \leq CR < 1 \quad \text{(rate increases)}
+\end{cases}
+\end{equation}
+
+Where $k = 1$ for BTD and $k = 3$ for BTB (higher risk compensation).
+
+\paragraph{BTD Deposit Rate}
+BTD uses a Sigmoid function with the following parameters:
 \begin{itemize}
-  \item \textbf{BTD Rate:} Synchronized with the federal funds rate, with risk premium added if necessary, adjustable by community governance; additionally, when depositors collect interest, an extra 10\% BTD is minted as system fee and deposited into the treasury;
-  \item \textbf{BTB Rate:} Dynamically adjusted through price intervals, encouraging buying when bonds are at discount and exiting when at premium;
+  \item $r_{max} = 10\%$: Maximum deposit rate
+  \item $r_{min} = 2\%$: Minimum deposit rate (reached at CR $\geq 150\%$)
+  \item $\alpha = 25$: Sigmoid steepness parameter (price range 0.8--1.2)
+  \item Range: 2\%--10\%
+\end{itemize}
+
+\begin{center}
+\begin{tabular}{ccc}
+\toprule
+Collateral Ratio & $\Delta_{CR}$ & Base Rate \\
+\midrule
+$\geq 150\%$ & $-0.6$ & $2\%$ (minimum) \\
+$100\%$ & $0$ & $5\%$ (default) \\
+$60\%$ & $0.5$ & $7.5\%$ \\
+$20\%$ & $1.0$ & $10\%$ (maximum) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The final BTD rate is calculated using:
+\begin{equation}
+r_{BTD}(P, CR) = r_{max} \cdot S\left(-\alpha \cdot (P - 1) + \beta(CR)\right)
+\end{equation}
+
+Where $\beta(CR) = \ln\left(\frac{r_{base}(CR)}{r_{max} - r_{base}(CR)}\right)$ and $S(x) = \frac{1}{1 + e^{-x}}$ is the Sigmoid function.
+
+\paragraph{BTB Bond Rate}
+BTB uses a 3x $\Delta_{CR}$ multiplier for higher risk compensation:
+\begin{itemize}
+  \item $r_{max} = 20\%$: Maximum bond rate
+  \item $r_{min} = 2\%$: Minimum bond rate (reached at CR $\geq 150\%$)
+  \item $\alpha = 10$: Sigmoid steepness parameter (price range 0.5--1.5)
+  \item Range: 2\%--20\%
+\end{itemize}
+
+\begin{center}
+\begin{tabular}{ccc}
+\toprule
+Collateral Ratio & $\Delta_{CR}$ (with 3x) & Base Rate \\
+\midrule
+$\geq 150\%$ & $-0.6$ & $2\%$ (minimum) \\
+$100\%$ & $0$ & $5\%$ (default) \\
+$60\%$ & $1.5$ & $12.5\%$ \\
+$20\%$ & $3.0$ & $20\%$ (maximum) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The final BTB rate is:
+\begin{equation}
+r_{BTB}(P, CR) = r_{max} \cdot S\left(-\alpha \cdot (P - 1) + \beta(CR)\right)
+\end{equation}
+
+\paragraph{Interest Rate Curves}
+Figure~\ref{fig:interest-rate-curves} illustrates the Sigmoid-based interest rate curves for both BTD and BTB at different collateral ratios.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{interest_rate_sigmoid.png}
+  \caption{BTD and BTB staking interest rate curves at different collateral ratios. The shaded regions indicate the effective price ranges for each token.}
+  \label{fig:interest-rate-curves}
+\end{figure}
+
+\paragraph{Rate Updates and Fees}
+\begin{itemize}
+  \item \textbf{Rate Updates:} Both rates are recalculated daily based on current CR and previous 24-hour TWAP prices obtained from on-chain oracles.
+  \item \textbf{Interest Fee:} When depositors collect interest, an extra 5\% is minted as system fee and deposited into the treasury.
   \item Both interest pools' rewards mint new tokens, which enter vault total assets and are distributed to stakers through share price appreciation.
 \end{itemize}
 
@@ -386,7 +453,7 @@ To prevent short-term interest rate attacks or reentrancy, there must be at leas
 \toprule
 Token & Risk Level & Primary Backing Assets & Return Source \\
 \midrule
-BTD & Low & BTC, BTB, BRS & Deposit rate (linked to FFR) \\
+BTD & Low & BTC, BTB, BRS & Deposit rate (based on CR) \\
 BTB & Medium & BTD reserves & Bond rate (dynamically adjusted) \\
 BRS & High & System residual equity & Mining output and treasury buyback \\
 \bottomrule
@@ -406,11 +473,10 @@ After the official genesis of the BRS system, there will be a beta testing perio
 \begin{itemize}
   \item \textbf{Core Constants Fully Solidified} (immutable):
     \begin{itemize}
-      \item All core contract addresses (BTD, BTB, BRS, Treasury, Minter, Config, etc.)
-      \item All oracle configurations (Pyth/Redstone/Chainlink feed IDs, data source addresses, precision)
+      \item All internal contract addresses (BTD, BTB, BRS, Treasury, Minter, Config, etc.)
       \item IUSD inflation parameters (2\% annual, monthly growth factor)
-      \item Core trading pool addresses (BTD/USDC, BTB/BTD, BRS/BTD, WBTC/USDC)
       \item BRS total supply cap (2.1 billion) and halving mechanism
+      \item Core calculation algorithms and precision configurations
     \end{itemize}
   \item \textbf{System Constants} (static constant):
     \begin{itemize}
@@ -421,9 +487,16 @@ After the official genesis of the BRS system, there will be a beta testing perio
 \end{itemize}
 
 \subsubsection{Governable Parameters and Their Constraints}
-A very small number of parameters retain governance capability, but are strictly constrained by \textbf{four security mechanisms}:
+A small number of parameters retain governance capability, but are strictly constrained by \textbf{security mechanisms}:
 
-\textbf{1. Price Deviation Tolerance} (default 1\%)
+\textbf{1. External System Addresses} (with timelock):
+\begin{itemize}
+  \item Oracle addresses (Chainlink feeds, Pyth, Redstone) --- subject to 7-day timelock and whitelist
+  \item DEX pool addresses (BTD/USDC, BTB/BTD, BRS/BTD, WBTC/USDC) --- subject to 7-day timelock
+  \item These addresses are governable to allow upgrades when external systems change or migrate
+\end{itemize}
+
+\textbf{2. Price Deviation Tolerance} (default 1\%)
 \begin{itemize}
   \item \textit{Boundary Check}: Can only be adjusted within 0.5\%--5\% range
   \item \textit{Unidirectional Tightening}: Can only lower the threshold, not raise it
@@ -431,32 +504,32 @@ A very small number of parameters retain governance capability, but are strictly
   \item \textit{Event Log}: Complete record of each change
 \end{itemize}
 
-\textbf{2. BTD Minting Fee} (default 1\%)
+\textbf{3. BTD Minting Fee} (default 0.5\%)
 \begin{itemize}
-  \item \textit{Range Limit}: 0\%--2\%
+  \item \textit{Range Limit}: 0\%--10\%
   \item \textit{Cooldown Period}: At least 3 days between adjustments
 \end{itemize}
 
-\textbf{3. BTB Minimum Price Protection} (default 0.5 BTD)
+\textbf{4. BTB Minimum Price Protection} (default 0.5 BTD)
 \begin{itemize}
   \item \textit{Range Limit}: 0.3--0.7 BTD
   \item \textit{Cooldown Period}: At least 7 days between adjustments
 \end{itemize}
 
-\textbf{4. BTB Maximum Annual Rate} (default 20\%)
+\textbf{5. BTB Maximum Annual Rate} (default 20\%)
 \begin{itemize}
   \item \textit{Range Limit}: 10\%--50\%
   \item \textit{Cooldown Period}: At least 7 days between adjustments
 \end{itemize}
 
-\textbf{5. Mining Allocation Weights}
+\textbf{6. Mining Allocation Weights}
 \begin{itemize}
   \item \textit{Whitelist Restriction}: Can only adjust weights within predefined pool set
   \item \textit{Total Conservation}: Sum of all weights always equals 100\%
   \item \textit{Cooldown Period}: At least 14 days between adjustments
 \end{itemize}
 
-\textbf{6. Emergency Operations} (contract pause, blacklist)
+\textbf{7. Emergency Operations} (contract pause, blacklist)
 \begin{itemize}
   \item \textit{Fast Track}: Can be quickly executed during security events, but requires multi-sig confirmation
   \item \textit{Timelock Exemption}: Pause operations are exempt from timelock, resume operations must go through complete governance process
@@ -551,10 +624,10 @@ System parameters and operations adjustable through on-chain governance include 
 
 \textbf{Economic Parameters:}
 \begin{itemize}
-  \item BTD minting fee ratio (default 1\%)
+  \item BTD minting fee ratio (default 0.5\%)
   \item BTB minimum price protection (default 0.5 BTD)
   \item BTB maximum annual rate cap (default 20\%)
-  \item Interest fee ratio (default 10\%)
+  \item Interest fee ratio (default 5\%)
   \item Price deviation tolerance threshold (default 1\%)
 \end{itemize}
 
@@ -598,7 +671,7 @@ To ensure governance security, the system employs multi-layer protection measure
 \toprule
 Parameter & Initial Value \\
 \midrule
-Proposal Threshold & 1 BRS \\
+Proposal Threshold & 250,000 BRS \\
 Voting Delay & 1 day \\
 Voting Period & 7 days \\
 Quorum & 4\% of total supply \\
@@ -627,9 +700,9 @@ The system design follows two core principles to ensure long-term stability and 
 
 \textbf{Weak Governance Principle} anchors system behavior to Bitcoin-like immutability:
 \begin{itemize}
-  \item \textbf{47\% of parameters fully solidified}: Core addresses, oracle configurations, IUSD inflation rate, BRS total supply, etc., set as immutable at deployment, never changeable
-  \item \textbf{20\% are static constants}: Mathematical precision, time conversion, safety ceilings, etc., determined at compile time
-  \item \textbf{Only 33\% of parameters are governable}: A very small number of parameters like fees, deviation thresholds, rate caps retain governance capability, but are strictly constrained by four security mechanisms (boundary checks, cooldown periods, whitelist restrictions, event logs)
+  \item \textbf{46\% are static constants}: Mathematical precision, time conversion, safety ceilings, interest rate parameters, etc., determined at compile time
+  \item \textbf{23\% of parameters fully solidified}: Core addresses, IUSD inflation rate, BRS total supply, etc., set as immutable at deployment, never changeable
+  \item \textbf{31\% of parameters are governable}: A small number of parameters like external system addresses, fees, deviation thresholds, rate caps retain governance capability, but are strictly constrained by security mechanisms (boundary checks, cooldown periods, whitelist restrictions, event logs)
   \item \textbf{Unidirectional Tightening Principle}: Price deviation threshold can only be gradually tightened, not loosened, preventing governance from lowering security standards
   \item \textbf{Timelock Protection}: All governance operations (except emergency pause) must go through at least 2 days of timelock delay, giving the community sufficient reaction time
 \end{itemize}
@@ -844,24 +917,23 @@ TWAP\_PERIOD & 30 minutes & TWAP observation period \\
 \end{center}
 }
 
-\subsubsection{Interest Rate Interval Constants (InterestPool)}
+\subsubsection{Interest Rate Constants (InterestPool)}
 
 {\small
 \begin{center}
-\begin{longtable}{p{6cm}p{3cm}p{5cm}}
+\begin{longtable}{p{6cm}p{3.5cm}p{4.5cm}}
 \toprule
 Parameter Name & Value & Description \\
 \midrule
 \endhead
-LOWER\_PRICE\_THRESHOLD & 0.99 BTD & BTB price lower threshold \\
-UPPER\_PRICE\_THRESHOLD & 1.01 BTD & BTB price upper threshold \\
-CR\_MIN & 30\% & CR minimum threshold \\
-CR\_LOW & 90\% & CR low threshold \\
-CR\_HIGH & 120\% & CR high threshold \\
-CR\_MAX & 200\% & CR maximum threshold \\
-BTD\_BASE\_RATE & 400 bps & BTD base rate (4\%) \\
-BTD\_MAX\_RATE & 2000 bps & BTD maximum rate (20\%) \\
-BTD\_MIN\_RATE & 0 bps & BTD minimum rate (0\%) \\
+\multicolumn{3}{l}{\textit{BTB CR-Based Parameters}} \\
+BTB\_CR\_THRESHOLD & $10^{18}$ & CR threshold (100\%) \\
+BTB\_CR\_MIN & $2 \times 10^{17}$ & Minimum CR (20\%) \\
+BTB\_CR\_DIVISOR & $8 \times 10^{17}$ & CR divisor for linear factor (0.8) \\
+\midrule
+\multicolumn{3}{l}{\textit{Rate Update Parameters}} \\
+RATE\_UPDATE\_INTERVAL & 86400 & Rate recalculation interval (24h) \\
+TWAP\_WINDOW\_DEFAULT & 86400 & TWAP observation window (24h) \\
 \bottomrule
 \end{longtable}
 \end{center}
@@ -911,13 +983,13 @@ Immutables are set through the constructor at contract deployment and never chan
 Parameter Name & Description \\
 \midrule
 \endhead
-WBTC & Wrapped BTC token address \\
-BTD & Stablecoin BTD token address \\
-BTB & Bond token BTB token address \\
-BRS & Governance token BRS token address \\
-WETH & Wrapped ETH token address \\
-USDC & USDC stablecoin address \\
-USDT & USDT stablecoin address \\
+wbtcAddr & Wrapped BTC token address \\
+btdAddr & Stablecoin BTD token address \\
+btbAddr & Bond token BTB token address \\
+brsAddr & Governance token BRS token address \\
+wethAddr & Wrapped ETH token address \\
+usdcAddr & USDC stablecoin address \\
+usdtAddr & USDT stablecoin address \\
 \bottomrule
 \end{longtable}
 \end{center}
@@ -930,66 +1002,22 @@ USDT & USDT stablecoin address \\
 Parameter Name & Description \\
 \midrule
 \endhead
-TREASURY & Treasury contract address \\
-MINTER & Minting and redemption contract address \\
-PRICE\_ORACLE & Price oracle contract address \\
-IDEAL\_USD\_MANAGER & IUSD manager address \\
-INTEREST\_POOL & Interest pool contract address \\
-STAKING\_ROUTER & Staking router contract address \\
-FARMING\_POOL & Mining pool contract address \\
-ST\_BTD & stBTD vault address \\
-ST\_BTB & stBTB vault address \\
-VESTING\_VAULT & Vesting vault address \\
-GOVERNOR & Governance contract address \\
-TWAP\_ORACLE & TWAP oracle address \\
-\bottomrule
-\end{longtable}
-\end{center}
-
-\subsubsection{Price Oracle Data Source Addresses (ConfigCore)}
-
-\begin{center}
-\begin{longtable}{p{5cm}p{9cm}}
-\toprule
-Parameter Name & Description \\
+treasuryAddr & Treasury contract address \\
+minterAddr & Minting and redemption contract address \\
+priceOracleAddr & Price oracle contract address \\
+idealUsdManagerAddr & IUSD manager address \\
+interestPoolAddr & Interest pool contract address \\
+stakingRouterAddr & Staking router contract address \\
+farmingPoolAddr & Mining pool contract address \\
+stBtdAddr & stBTD vault address \\
+stBtbAddr & stBTB vault address \\
+governorAddr & Governance contract address \\
+twapOracleAddr & TWAP oracle address \\
 \midrule
-\endhead
-CHAINLINK\_BTC\_USD & Chainlink BTC/USD price feed \\
-CHAINLINK\_WBTC\_BTC & Chainlink WBTC/BTC price feed \\
-PYTH\_WBTC & Pyth WBTC price feed \\
-REDSTONE\_WBTC & Redstone WBTC price feed \\
-\bottomrule
-\end{longtable}
-\end{center}
-
-\subsubsection{Uniswap V2 Trading Pair Addresses (ConfigCore)}
-
-\begin{center}
-\begin{longtable}{p{4.5cm}p{9.5cm}}
-\toprule
-Parameter Name & Description \\
-\midrule
-\endhead
-POOL\_WBTC\_USDC & WBTC-USDC trading pair (for WBTC price) \\
-POOL\_BTD\_USDC & BTD-USDC trading pair (for BTD price) \\
-POOL\_BTB\_BTD & BTB-BTD trading pair (for BTB price) \\
-POOL\_BRS\_BTD & BRS-BTD trading pair (for BRS price) \\
-\bottomrule
-\end{longtable}
-\end{center}
-
-\subsubsection{Oracle Configuration Parameters (PriceOracle)}
-
-\begin{center}
-\begin{longtable}{p{5.5cm}p{8.5cm}}
-\toprule
-Parameter Name & Description \\
-\midrule
-\endhead
-pythWbtcPriceId & Pyth WBTC price ID (bytes32) \\
-redstoneWbtcDataFeedId & Redstone WBTC data feed ID (bytes32) \\
-redstoneWbtcDecimals & Redstone precision configuration \\
-useTWAPDefault & TWAP default enable status \\
+\multicolumn{2}{l}{\textit{DEX Pool Addresses}} \\
+poolBtdUsdc & BTD-USDC trading pair (for BTD price) \\
+poolBtbBtd & BTB-BTD trading pair (for BTB price) \\
+poolBrsBtd & BRS-BTD trading pair (for BRS price) \\
 \bottomrule
 \end{longtable}
 \end{center}
@@ -1002,34 +1030,10 @@ useTWAPDefault & TWAP default enable status \\
 Parameter Name & Description \\
 \midrule
 \endhead
-rewardToken & BRS reward token address \\
 startTime & Mining start timestamp \\
 \bottomrule
 \end{longtable}
 \end{center}
-
-\subsubsection{Vesting Parameters (VestingVault)}
-
-{\small
-\begin{center}
-\begin{longtable}{p{6cm}p{2.5cm}p{5.5cm}}
-\toprule
-Parameter Name & Type & Description \\
-\midrule
-\endhead
-token & address & Vesting token (BRS) \\
-foundationSchedule.beneficiary & address & Foundation beneficiary \\
-foundationSchedule.cliff & uint64 & Foundation lock period \\
-foundationSchedule.duration & uint64 & Foundation release cycle \\
-foundationSchedule.total & uint256 & Foundation total allocation \\
-teamSchedule.beneficiary & address & Team beneficiary \\
-teamSchedule.cliff & uint64 & Team lock period \\
-teamSchedule.duration & uint64 & Team release cycle \\
-teamSchedule.total & uint256 & Team total allocation \\
-\bottomrule
-\end{longtable}
-\end{center}
-}
 
 \subsection{Governable Variables (Governable)}
 
@@ -1043,9 +1047,9 @@ Governable variables can be adjusted at runtime through governance mechanisms, b
 Parameter Name & Default & Range & Description \\
 \midrule
 \endhead
-MINT\_FEE\_BP & 100 bps & 0--200 bps & Minting fee (1\%) \\
-REDEEM\_FEE\_BP & 0 bps & 0--200 bps & Redemption fee \\
-INTEREST\_FEE\_BP & 1000 bps & 0--2000 bps & Interest fee (10\%) \\
+mintFeeBp & 50 bps & 0--1000 bps & Minting fee (0.5\%) \\
+redeemFeeBp & 50 bps & 0--1000 bps & Redemption fee (0.5\%) \\
+interestFeeBp & 500 bps & 0--2000 bps & Interest fee (5\%) \\
 \bottomrule
 \end{longtable}
 \end{center}
@@ -1059,23 +1063,43 @@ INTEREST\_FEE\_BP & 1000 bps & 0--2000 bps & Interest fee (10\%) \\
 Parameter Name & Default & Range & Description \\
 \midrule
 \endhead
-MIN\_BTB\_PRICE & 0.5 BTD & 0.3--0.7 BTD & BTB minimum price protection \\
-MAX\_BTB\_RATE & 2000 bps & 1000--5000 bps & BTB maximum rate (20\%) \\
-PCE\_MAX\_DEVIATION & 2\% & 0--10\% & PCE maximum deviation rate \\
+minBtbPrice & 0.5 BTD & 0.3--0.7 BTD & BTB minimum price protection \\
+pceMaxDeviation & 2\% & 0--10\% & PCE maximum deviation rate \\
 \bottomrule
 \end{longtable}
 \end{center}
 }
 
-\subsubsection{Address Parameters (ConfigGov)}
+\subsubsection{External Oracle Address Parameters (ConfigGov)}
+
+External oracle addresses are governable to allow upgrades when external systems change. All changes are subject to 7-day timelock and whitelist restrictions.
 
 \begin{center}
-\begin{longtable}{p{4cm}p{10cm}}
+\begin{longtable}{p{5cm}p{9cm}}
 \toprule
 Parameter Name & Description \\
 \midrule
 \endhead
-PCE\_FEED & Chainlink PCE oracle address \\
+pceFeedAddr & Chainlink PCE oracle address \\
+chainlinkBtcUsdAddr & Chainlink BTC/USD price feed \\
+chainlinkWbtcBtcAddr & Chainlink WBTC/BTC price feed \\
+pythWbtcAddr & Pyth WBTC price feed address \\
+redstoneWbtcAddr & Redstone WBTC price feed address \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\subsubsection{DEX Pool Address Parameters (ConfigGov)}
+
+DEX pool addresses are governable to allow upgrades when liquidity migrates. All changes are subject to 7-day timelock.
+
+\begin{center}
+\begin{longtable}{p{4.5cm}p{9.5cm}}
+\toprule
+Parameter Name & Description \\
+\midrule
+\endhead
+poolWbtcUsdcAddr & WBTC-USDC trading pair (for WBTC price) \\
 \bottomrule
 \end{longtable}
 \end{center}
@@ -1089,8 +1113,7 @@ Parameter Name & Default & Constraint & Description \\
 \midrule
 \endhead
 maxDeviationBps & 100 bps & Can only tighten & Price deviation tolerance \\
-useTWAP & true & Boolean & TWAP mode switch \\
-twapOracle & Address & Whitelist & TWAP oracle address \\
+useTwap & true & Boolean & TWAP mode switch \\
 \bottomrule
 \end{longtable}
 \end{center}
@@ -1103,12 +1126,14 @@ twapOracle & Address & Whitelist & TWAP oracle address \\
 Parameter Name & Default & Description \\
 \midrule
 \endhead
-btdPool.annualRateBps & 400 bps & BTD annual rate, dynamically adjusted based on CR \\
-btbPool.annualRateBps & 400 bps & BTB annual rate, dynamically adjusted based on price \\
-rateOracle & Address & Rate oracle address \\
+btdMaxRateBps & 2000 bps & BTD maximum rate (20\%), adjustable 1000--3000 bps \\
+btbMaxRateBps & 2000 bps & BTB maximum rate (20\%), adjustable 1000--3000 bps \\
+twapWindow & 24 hours & TWAP observation window (adjustable 12--48 hours) \\
 \bottomrule
 \end{longtable}
 \end{center}
+
+\textbf{Note:} BTD and BTB rates are calculated algorithmically using Sigmoid functions based on 24-hour TWAP prices and collateral ratio (CR). Base rate is $r_{default} \times (1 + \Delta_{CR})$ where $r_{default} = 5\%$. BTD range is 2\%--10\% with $\Delta_{CR} = (1-CR)/0.8$. BTB range is 2\%--20\% with 3x $\Delta_{CR}$ multiplier for higher risk compensation. Both reach 2\% minimum when CR $\geq$ 150\%.
 
 \subsubsection{Mining Allocation Parameters (FarmingPool)}
 
@@ -1165,7 +1190,7 @@ updaterWhitelistEnabled & Whitelist enable switch \\
 Parameter Name & Description \\
 \midrule
 \endhead
-router & Uniswap V2 Router address (for buybacks) \\
+routerAddr & Uniswap V2 Router address (for buybacks) \\
 \bottomrule
 \end{longtable}
 \end{center}
@@ -1177,18 +1202,18 @@ router & Uniswap V2 Router address (for buybacks) \\
 \toprule
 Category & Count & Percentage \\
 \midrule
-Static Constants (constant) & ~45 & ~45\% \\
-Immutables (immutable) & ~35 & ~35\% \\
-Governable Variables (governable) & ~20 & ~20\% \\
+Static Constants (constant) & $\sim$43 & $\sim$46\% \\
+Immutables (immutable) & $\sim$22 & $\sim$23\% \\
+Governable Variables (governable) & $\sim$29 & $\sim$31\% \\
 \midrule
-\textbf{Total} & \textbf{~100} & \textbf{100\%} \\
+\textbf{Total} & \textbf{$\sim$94} & \textbf{100\%} \\
 \bottomrule
 \end{tabular}
 \end{center}
 
 \textbf{Design Notes:}
 
-Approximately 80\% of system parameters are solidified at deployment (constant + immutable), with only 20\% retaining governance capability. This ``weak governance'' design ensures:
+Approximately 69\% of system parameters are solidified at deployment (constant + immutable), with only 31\% retaining governance capability. This ``weak governance'' design ensures:
 
 \begin{itemize}
   \item \textbf{Predictability}: Users and developers can rely on the system's core behavior not being changed by governance

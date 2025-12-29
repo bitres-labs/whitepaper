@@ -349,7 +349,7 @@ There are two important interest rates in the Bitres: deposit rate and bond rate
 
 \subsection{Deposit Rate}
 
-The deposit rate is determined by the market, with the basic goal of making the stablecoin price as close as possible to the Ideal USD price. The specific strategy is: when BTD's market price is less than IUSD's price and continues to fall, the system raises the deposit rate to increase attractiveness; when BTD's market price is greater than IUSD's price and continues to rise, the system lowers the deposit rate. The ultimate target range for stablecoin price control is 0.99--1.01 IUSD. When the stablecoin price is within this range, the deposit rate remains unchanged.
+The deposit rate is determined algorithmically based on BTD's market price relative to IUSD, implementing a negative feedback mechanism to maintain price stability. The principle is simple: when BTD's price falls below the anchor, the system raises the deposit rate to make holding BTD more attractive, thereby increasing demand and pushing the price back up; when BTD's price rises above the anchor, the system lowers the deposit rate to reduce the incentive for holding BTD. The rate adjusts continuously with price deviation---the further the price deviates from the anchor, the stronger the rate adjustment.
 
 The specific deposit rate adjustment mechanism is shown in Table~\ref{tab:deposit-rate}.
 
@@ -357,22 +357,20 @@ The specific deposit rate adjustment mechanism is shown in Table~\ref{tab:deposi
 \centering
 \caption{Deposit Rate Policy}
 \label{tab:deposit-rate}
-\begin{tabular}{c|c|c}
+\begin{tabular}{c|c}
 \toprule
-BTD Price Range & Price Movement & Rate Policy \\
+BTD Price Range & Rate Policy \\
 \midrule
-$<$0.99 IUSD & Falling & Raise Rate \\
-$<$0.99 IUSD & Rising & Unchanged \\
-{[0.99 IUSD, 1.01 IUSD]} & Either & Unchanged \\
-$>$1.01 IUSD & Falling & Unchanged \\
-$>$1.01 IUSD & Rising & Lower Rate \\
+$<$1.0 IUSD & Higher Rate (increases as price falls) \\
+$=$1.0 IUSD & Base Rate \\
+$>$1.0 IUSD & Lower Rate (decreases as price rises) \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \subsection{Bond Rate}
 
-The bond rate is determined by the market, with the basic goal of making the bond price as close as possible to the stablecoin price. The specific strategy is: when BTB's market price is less than BTD's market price and continues to fall, the system raises the bond rate to increase attractiveness; when BTB's market price is greater than BTD's market price and continues to rise, the system lowers the bond rate. The ultimate target range for bond price control is 0.99--1.01 BTD. When the bond price is within this range, the bond rate remains unchanged.
+The bond rate follows the same negative feedback principle as the deposit rate, but targets BTB's price relative to BTD. When BTB's price falls below the anchor (1 BTD), the system raises the bond rate to increase attractiveness; when BTB's price rises above the anchor, the system lowers the bond rate. Additionally, the bond base rate is adjusted according to the collateral ratio---when the collateral ratio is below 100\%, the base rate increases to compensate for the additional risk that BTB cannot be immediately redeemed.
 
 The specific bond rate adjustment mechanism is shown in Table~\ref{tab:bond-rate}.
 
@@ -380,15 +378,13 @@ The specific bond rate adjustment mechanism is shown in Table~\ref{tab:bond-rate
 \centering
 \caption{Bond Rate Policy}
 \label{tab:bond-rate}
-\begin{tabular}{c|c|c}
+\begin{tabular}{c|c}
 \toprule
-BTB Price Range & Price Movement & Rate Policy \\
+BTB Price Range & Rate Policy \\
 \midrule
-$<$0.99 BTD & Falling & Raise Rate \\
-$<$0.99 BTD & Rising & Unchanged \\
-{[0.99 BTD, 1.01 BTD]} & Either & Unchanged \\
-$>$1.01 BTD & Falling & Unchanged \\
-$>$1.01 BTD & Rising & Lower Rate \\
+$<$1.0 BTD & Higher Rate (increases as price falls) \\
+$=$1.0 BTD & Base Rate \\
+$>$1.0 BTD & Lower Rate (decreases as price rises) \\
 \bottomrule
 \end{tabular}
 \end{table}

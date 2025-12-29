@@ -21,3 +21,6 @@ Thumbs.db
 
 # Keep PDF (comment out if you don't want to track PDFs)
 # *.pdf
+
+# Local Chinese translation (not tracked)
+system-design-cn/
