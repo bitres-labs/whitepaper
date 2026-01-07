@@ -1,0 +1,105 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath}
+\usepackage{cite}
+\usepackage{hyperref}
+
+\title{Inflationary Bitcoin: From Digital Gold Back to Electronic Cash}
+\author{Invariant Core \texttt{invariantcore@gmail.com}}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Bitcoin's deflationary monetary policy, characterized by a fixed supply cap of 21 million coins and diminishing issuance rates, has transformed it from Satoshi Nakamoto's vision of peer-to-peer electronic cash into a store of value akin to digital gold. This paper proposes a novel token design that aims to restore Bitcoin's original purpose as electronic cash by introducing controlled inflation while maintaining Bitcoin as the underlying reserve asset. By implementing a pegged token with 2\% annual inflation and a corresponding staking mechanism, we demonstrate a pathway from digital gold back to electronic cash that aligns with mainstream monetary economics while preserving the decentralized properties of Bitcoin.
+\end{abstract}
+
+\section{Introduction}
+
+Bitcoin's monetary policy is characterized by absolute scarcity \cite{nakamoto2008}. With a maximum supply of 21 million coins and periodic halvings of block rewards, Bitcoin's inflation rate has declined from 100\% in its second year to approximately 0.8\% in 2025, asymptotically approaching zero. While this predictable scarcity has attracted investors seeking a hedge against fiat currency debasement, it fundamentally contradicts conventional monetary theory.
+
+Mainstream economists argue that a moderate inflation rate of approximately 2\% annually is appropriate for economic growth, with the Federal Reserve adopting this as its inflation control target \cite{fomc2012statement}. Deflationary currencies incentivize hoarding rather than spending, potentially leading to reduced economic velocity and demand contraction \cite{krugman1998}. Bitcoin's evolution from "electronic cash" to "digital gold" exemplifies this phenomenon: users increasingly hold Bitcoin as a speculative asset rather than use it for transactions, deviating from Satoshi Nakamoto's original vision.
+
+This paper proposes a solution to restore Bitcoin's role as electronic cash while bridging the gap between Bitcoin's deflationary design and the inflationary requirements of functional currency systems.
+
+\section{Proposed Mechanism}
+
+We introduce a token system, denoted IBTC, with the following properties:
+
+\subsection{Inflationary Peg}
+The token maintains a declining peg to Bitcoin, depreciating at exactly 2\% annually. Mathematically, the BTC to IBTC exchange rate at time $t$ (in years) is:
+
+\begin{equation}
+E(t) = E_0 \cdot (1.02)^t
+\end{equation}
+
+where $E(t)$ represents the number of IBTC tokens equivalent to 1 BTC. For instance, if $E_0 = 1$ at year 0, then $E(1) = 1.02$ at year 1, meaning 1 IBTC $\approx$ 0.9804 BTC. This design implements Friedman's k-percent rule \cite{friedman1968}, providing predictable monetary expansion.
+
+\subsection{Staking Mechanism}
+To prevent immediate capital flight to Bitcoin, we implement a staking contract offering 2\% annual yield. Users who stake IBTC tokens receive returns that exactly offset the token's depreciation relative to Bitcoin:
+
+\begin{equation}
+\text{Staked IBTC}_{t+1} = \text{Staked IBTC}_t \cdot 1.02
+\end{equation}
+
+This creates parity: holding staked IBTC is economically equivalent to holding Bitcoin, while unstaked IBTC serves as a medium of exchange.
+
+\subsection{Economic Incentives}
+The system generates revenue through partial staking participation. If total IBTC supply is $S$ and staked amount is $S_s < S$, the system allocates:
+\begin{itemize}
+    \item Total interest generated: $0.02S$ (in BTC terms)
+    \item Interest paid to stakers: $0.02S_s$
+    \item System operator revenue: $0.02(S - S_s)$
+\end{itemize}
+
+This residual provides sustainable economic incentives for system maintenance and promotion.
+
+\section{Economic Analysis}
+
+The proposed design addresses Bitcoin's core deficiencies as currency:
+
+\textbf{Spending Incentive:} The 2\% depreciation rate encourages circulation rather than hoarding, aligning with velocity requirements of functional money.
+
+\textbf{Store of Value Option:} Staking eliminates Bitcoin value dilution and provides an alternative choice for Bitcoin maximalists.
+
+\textbf{Self-Sustainability:} The revenue model creates natural economic incentives for ecosystem development without relying on speculative price appreciation.
+
+This BTC-IBTC dual-token architecture effectively separates Bitcoin's store-of-value function from the medium-of-exchange function, allowing each to optimize for its respective purpose.
+
+\section{Conclusion}
+
+By introducing controlled inflation through a pegged token system while preserving Bitcoin's deflationary base layer, this design offers a pathway to restore Bitcoin's original purpose as electronic cash. The mechanism demonstrates that digital currencies need not choose between ideological purity and economic functionality, enabling Bitcoin to return from digital gold to electronic cash while maintaining its core decentralized properties. At present, two factors constrain IBTC from becoming a widely used electronic currency. First, Bitcoin's market capitalization remains insufficient compared to U.S. Treasury bonds, and while price volatility has diminished from its early days, it remains unstable relative to fiat currencies. Second, the current mainnet's 10-minute block confirmation times and approximately 7 transactions per second processing capacity cannot support Bitcoin becoming a true large-scale electronic cash system. In the future, Bitcoin will continue to expand consensus, increase market capitalization, and reduce price volatility, while Bitcoin's native Layer 2 networks may mature. At that point, IBTC could potentially be implemented and widely adopted on Layer 2 networks.
+
+\begin{thebibliography}{9}
+
+\bibitem{nakamoto2008}
+Nakamoto, S. (2008).
+\textit{Bitcoin: A Peer-to-Peer Electronic Cash System}.
+Bitcoin.org.
+
+\bibitem{fomc2012statement}
+Federal Open Market Committee (2012).
+\textit{Statement on longer-run goals and monetary policy strategy}.
+\url{https://www.federalreserve.gov/monetarypolicy/files/FOMC_LongerRunGoals.pdf}.
+Most recently reaffirmed in 2024.
+
+\bibitem{krugman1998}
+Krugman, P. (1998).
+\textit{It's Baaack: Japan's Slump and the Return of the Liquidity Trap}.
+Brookings Papers on Economic Activity, 1998(2), 137-205.
+
+\bibitem{friedman1968}
+Friedman, M. (1968).
+\textit{The Role of Monetary Policy}.
+American Economic Review, 58(1), 1-17.
+
+\bibitem{selgin2015}
+Selgin, G. (2015).
+\textit{Synthetic Commodity Money}.
+Journal of Financial Stability, 17, 92-99.
+
+\end{thebibliography}
+
+\end{document}
