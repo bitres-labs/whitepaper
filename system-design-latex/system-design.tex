@@ -92,10 +92,10 @@ If the deviation between the two exceeds 1\%, the minting process will terminate
 \subsubsection{Oracle Parameter Governance Strategy}
 Oracle configuration follows a balanced approach between security and flexibility:
 \begin{itemize}
-  \item \textbf{Governable External Addresses}: External oracle addresses (Chainlink feeds, Pyth, Redstone) and DEX pool addresses are governable to allow upgrades when external systems change. Changes are subject to timelock delay (7 days) and whitelist restrictions.
+  \item \textbf{Governable External Addresses}: External oracle addresses (Chainlink feeds, Pyth) and DEX pool addresses are governable to allow upgrades when external systems change. Changes are subject to timelock delay (7 days) and whitelist restrictions.
   \item \textbf{Immutable Core Logic}: Price ID formats, precision configuration, and calculation algorithms are immutable after deployment.
   \item \textbf{Deviation Threshold Governance}: Price deviation tolerance is governable, but can only be \textit{unidirectionally tightened} (from 1\% to stricter values), and is constrained by cooldown period (1 day) and range limits (0.5\%--5\%).
-  \item \textbf{Functional Price Aggregation}: Price calculation logic is encapsulated as a pure function library, including multi-source median calculation, deviation validation, etc., independent of mutable state, ensuring the algorithm is transparent and immutable.
+  \item \textbf{Functional Price Aggregation}: Price calculation logic is encapsulated as a pure function library, including dual-source consistency validation, deviation checking, etc., independent of mutable state, ensuring the algorithm is transparent and immutable.
 \end{itemize}
 
 \subsection{Collateral Ratio Definition}
@@ -491,7 +491,7 @@ A small number of parameters retain governance capability, but are strictly cons
 
 \textbf{1. External System Addresses} (with timelock):
 \begin{itemize}
-  \item Oracle addresses (Chainlink feeds, Pyth, Redstone) --- subject to 7-day timelock and whitelist
+  \item Oracle addresses (Chainlink feeds, Pyth) --- subject to 7-day timelock and whitelist
   \item DEX pool addresses (BTD/USDC, BTB/BTD, BRS/BTD, WBTC/USDC) --- subject to 7-day timelock
   \item These addresses are governable to allow upgrades when external systems change or migrate
 \end{itemize}
@@ -1084,7 +1084,6 @@ pceFeedAddr & Chainlink PCE oracle address \\
 chainlinkBtcUsdAddr & Chainlink BTC/USD price feed \\
 chainlinkWbtcBtcAddr & Chainlink WBTC/BTC price feed \\
 pythWbtcAddr & Pyth WBTC price feed address \\
-redstoneWbtcAddr & Redstone WBTC price feed address \\
 \bottomrule
 \end{longtable}
 \end{center}
