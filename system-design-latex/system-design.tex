@@ -10,19 +10,19 @@
 \usepackage{hyperref}
 \usepackage{url}
 
-\title{Bitres System Design Document: Functional Architecture and Weak Governance}
+\title{Bitres System Design Document: Functional Architecture, Weak Governance, and Progressive Decentralization}
 \author{Invariant Core\\
 \texttt{invariantcore@gmail.com}\\
 \url{https://www.bitres.org}}
 \date{\today}
 
-\renewcommand{\shorttitle}{Bitres System Design Document: Functional Architecture and Weak Governance}
+\renewcommand{\shorttitle}{Bitres System Design Document: Functional Architecture, Weak Governance, and Progressive Decentralization}
 \hypersetup{
   colorlinks=true,
   linkcolor=blue,
   citecolor=blue,
   urlcolor=blue,
-  pdftitle={Bitres System Design Document: Functional Architecture and Weak Governance},
+  pdftitle={Bitres System Design Document: Functional Architecture, Weak Governance, and Progressive Decentralization},
   pdfauthor={Bitres Labs}
 }
 
@@ -39,19 +39,20 @@
 \section{Document Objectives}
 This document is written based on the Bitres whitepaper: ``Bitres: A Decentralized Stablecoin System Collateralized by Bitcoin''. The document elaborates on the overall architecture and design objectives of Bitres, as well as the economics of three tokens, including the stablecoin BTD, bond token BTB, and governance token BRS. The document focuses on token supply, price pegging, collateral safety thresholds, and incentive parameters, aiming to provide a requirements specification consistent with the whitepaper for subsequent economic analysis and implementation iterations, without relying on any specific implementation's function or variable names.
 
-\subsection{Design Philosophy: Functional and Weak Governance}
-The system adopts a design philosophy of \textbf{functional programming} and \textbf{weak governance}, aiming to achieve immutability and predictability similar to Bitcoin:
+\subsection{Design Philosophy: Functional, Weak Governance, and Progressive Decentralization}
+The system adopts a design philosophy of \textbf{functional programming}, \textbf{weak governance}, and \textbf{progressive decentralization}, aiming to achieve immutability and predictability similar to Bitcoin while providing a safe path from initial deployment to full community control:
 \begin{itemize}
   \item \textbf{Functional Architecture}: Core business logic is abstracted into pure function libraries, with minimal contract state. Price calculation, deviation validation, IUSD adjustment, and other algorithms are solidified as mathematical formulas, independent of mutable state, ensuring behavioral determinism.
-  \item \textbf{Weak Governance Principle}: The system hard-codes the vast majority of parameters as immutable constants at launch, retaining only minimal governance capability for a very small number of necessary parameters. Governable parameters must satisfy four strict security mechanisms: boundary checks, cooldown periods, whitelist restrictions, and event logging.
+  \item \textbf{Weak Governance Principle}: The system hard-codes the vast majority of parameters as immutable constants at launch, retaining only minimal governance capability for a very small number of necessary parameters. Governable parameters must satisfy strict security mechanisms: boundary checks, cooldown periods, whitelist restrictions, and event logging.
+  \item \textbf{Progressive Decentralization}: To allow post-launch bug fixes and iterative improvements, all core functional contracts adopt the UUPS (Universal Upgradeable Proxy Standard) proxy pattern, enabling upgrades without disrupting user-facing addresses. Governance authority transitions through three phases: (1) administrator full control at launch for rapid bug fixing; (2) transfer to on-chain governance (BRS token voting + timelock) after system stabilization; (3) permanent freeze via ownership renunciation for battle-tested contracts that no longer need changes.
   \item \textbf{Parameter Classification System}:
     \begin{itemize}
       \item \textit{Static Constants} (constant): Mathematical constants, precision, time parameters, etc., determined at compile time
-      \item \textit{Immutables} (immutable): Core addresses, oracle IDs, inflation parameters, etc., set at deployment and never changeable
+      \item \textit{Deployment-Configured Parameters} (initialized once): Core addresses, oracle IDs, inflation parameters, etc., set during contract initialization and never modified thereafter
       \item \textit{Governable Parameters} (governable): A very small number of parameters requiring flexible adjustment, subject to strict constraints
     \end{itemize}
 \end{itemize}
-This design ensures the system behaves as close to Bitcoin's immutability as possible while retaining minimal flexibility to handle extreme situations.
+This design ensures the system behaves as close to Bitcoin's immutability as possible while retaining minimal flexibility to handle extreme situations and providing a credible path toward full decentralization.
 
 \section{Overall Structure Overview}
 The system contains a custody module, a minting and redemption module, a parameter configuration module, plus two incentive modules for interest rates and mining.
@@ -74,8 +75,8 @@ IUSD is initially priced at 1 USD, with a target annual inflation rate of 2\%, i
 \subsubsection{Inflation Parameter Solidification}
 \textbf{The 2\% annual inflation rate of IUSD is the system's core monetary policy commitment, fully solidified at deployment}:
 \begin{itemize}
-  \item \textbf{Immutable Constants}: The annual inflation rate (2\% = 0.02) and monthly growth factor ($1.02^{1/12} \approx 1.001651581301920174$) are set as immutable parameters in the constructor, never modifiable after deployment.
-  \item \textbf{PCE Oracle Solidification}: The data source address and precision configuration for the US PCE (Personal Consumption Expenditure) price index are solidified at deployment, preventing data source tampering.
+  \item \textbf{Static Constants}: The annual inflation rate (2\% = 0.02) and monthly growth factor ($1.02^{1/12} \approx 1.001651581301920174$) are defined as static constants in the Constants library, compiled into bytecode and never modifiable.
+  \item \textbf{PCE Oracle Configuration}: The PCE data source address is configured through ConfigGov (governable to allow feed upgrades), while precision configuration is static.
   \item \textbf{Functional Adjustment Factor Calculation}: The calculation logic for the IUSD adjustment factor is encapsulated as a pure function library, deterministically calculated based on on-chain PCE data and solidified inflation targets through mathematical formulas, independent of mutable state.
   \item \textbf{Emergency Override Mechanism}: Only in extreme situations such as PCE oracle failure, authorized addresses are allowed to manually override the IUSD value, but subject to strict restrictions: deviation not exceeding 5\%, interval of at least 7 days, and complete event log recording.
 \end{itemize}
@@ -463,7 +464,103 @@ BTD enjoys the highest priority redemption order; BTB has priority redemption af
 
 \section{Governance}
 
-After the official genesis of the BRS system, there will be a beta testing period. During this period, to quickly fix bugs and add necessary features based on market demand, governance rights for the entire system will be controlled by the development team. Once the system develops to a certain stage and enters a stable period, the development team will transfer governance rights to the community. From then on, the system adopts an on-chain governance mechanism based on BRS tokens, ensuring the community can democratically participate in system parameter adjustments and protocol upgrade decisions. The governance architecture follows the OpenZeppelin Governor standard, providing transparent and auditable proposal and voting processes.
+The Bitres system adopts a \textbf{progressive decentralization} model for governance. Because newly deployed smart contracts may contain undiscovered bugs, the system launches with administrator control to enable rapid iteration and bug fixing, then gradually transitions to community governance as the protocol matures and gains confidence. The governance architecture follows the OpenZeppelin Governor standard, providing transparent and auditable proposal and voting processes.
+
+\subsection{Progressive Decentralization Lifecycle}
+
+The system transitions through three distinct governance phases:
+
+\subsubsection{Phase 1: Administrator Mode (Launch)}
+At system genesis, all upgradeable contracts are owned by the deployer (a multi-signature wallet). This enables:
+\begin{itemize}
+  \item Rapid bug fixes and security patches without governance delay
+  \item Parameter tuning based on real market conditions
+  \item Contract upgrades via \texttt{upgradeToAndCall()} to deploy improved implementations
+  \item Quick response to security incidents (emergency pause, parameter adjustment)
+\end{itemize}
+During this phase, the administrator has full authority to upgrade contracts and adjust all governable parameters. All operations are recorded in on-chain events for transparency.
+
+\subsubsection{Phase 2: Governance Mode (After Stabilization)}
+Once the system has operated stably for a sufficient period and undergone thorough auditing, the administrator transfers ownership of all upgradeable contracts to a \texttt{TimelockController}:
+\begin{itemize}
+  \item The \texttt{TimelockController} is controlled by the \texttt{Governor} contract (BRS token voting)
+  \item All parameter changes and contract upgrades require: proposal creation $\rightarrow$ voting period (7 days) $\rightarrow$ timelock delay (2 days) $\rightarrow$ execution
+  \item Community members holding sufficient BRS can create proposals and vote
+  \item Emergency operations (contract pause) can use expedited governance processes
+\end{itemize}
+The transition is executed by calling \texttt{transferOwnership(timelockAddress)} on each upgradeable contract, a one-way operation that permanently removes administrator privileges.
+
+\subsubsection{Phase 3: Selective Freeze (Per-Contract)}
+For contracts that have been battle-tested and are not expected to require further changes, the governance community can propose to permanently freeze them:
+\begin{itemize}
+  \item A governance proposal calls \texttt{renounceOwnership()} on the target contract
+  \item Once \texttt{owner() == address(0)}, the \texttt{onlyOwner} modifier always reverts
+  \item The \texttt{\_authorizeUpgrade()} function can never be called, making the contract permanently immutable
+  \item \textbf{This operation is irreversible} --- only recommended for thoroughly audited, stable contracts
+  \item Contracts and parameters that still need adjustment retain governance control indefinitely
+\end{itemize}
+
+\textbf{Classification of Freeze Candidates:}
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+Category & Contracts & Freeze Likelihood \\
+\midrule
+Early freeze candidates & ConfigGov, PriceOracle & High (pure config/oracle) \\
+Medium-term candidates & Minter, Treasury & Medium (core business logic) \\
+Long-term governance & InterestPool, FarmingPool & Low (needs ongoing tuning) \\
+Retain governance & IdealUSDManager, Governor & Indefinite (evolving requirements) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Contract Upgradeability Architecture}
+
+The system uses the \textbf{UUPS (Universal Upgradeable Proxy Standard)} pattern from OpenZeppelin. Each upgradeable contract is deployed as a pair: an implementation contract containing the logic, and an ERC1967 proxy contract that stores state and delegates calls to the implementation.
+
+\subsubsection{Upgradeable Contracts (8)}
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+Contract & Role \\
+\midrule
+ConfigGov & Parameter governance \\
+IdealUSDManager & IUSD inflation management \\
+PriceOracle & Multi-source price aggregation \\
+Treasury & Collateral custody and buyback \\
+Minter & Minting and redemption core \\
+InterestPool & Interest rate calculation and distribution \\
+FarmingPool & BRS mining reward distribution \\
+Governor & On-chain governance (proposal/voting) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+These contracts inherit \texttt{Initializable}, \texttt{UUPSUpgradeable}, and other OpenZeppelin Upgradeable mixins. Key properties:
+\begin{itemize}
+  \item \textbf{Transparent to users}: Proxy addresses are stable; upgrades only change the underlying implementation
+  \item \textbf{State preservation}: All storage (balances, configurations, accumulated values) survives upgrades
+  \item \textbf{Authorization guard}: \texttt{\_authorizeUpgrade()} enforces \texttt{onlyOwner}, preventing unauthorized upgrades
+  \item \textbf{Storage gap}: Each contract reserves \texttt{uint256[50] private \_\_gap} for future storage extensions
+  \item \textbf{Initialization protection}: Constructors call \texttt{\_disableInitializers()} to prevent implementation contracts from being initialized directly
+\end{itemize}
+
+\subsubsection{Non-Upgradeable Contracts (7)}
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+Contract & Role & Reason for Non-Upgradeability \\
+\midrule
+BTD, BTB & ERC20 tokens & Standard token, no business logic \\
+BRS & Governance token & Fixed supply, ERC20Votes \\
+stBTD, stBTB & ERC4626 vaults & Pure vault, no complex logic \\
+ConfigCore & Address registry & Immutable system anchor \\
+UniswapV2TWAPOracle & TWAP oracle & Stateless, replaceable via PriceOracle \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+ConfigCore serves as the immutable anchor of the system: it stores all contract addresses (including proxy addresses of upgradeable contracts) as truly immutable values set at deployment. Since proxy addresses never change, ConfigCore's references remain valid even after upgrades to the underlying implementations.
 
 \subsection{Weak Governance Design Principles}
 
@@ -471,12 +568,13 @@ After the official genesis of the BRS system, there will be a beta testing perio
 
 \subsubsection{Parameter Solidification Strategy}
 \begin{itemize}
-  \item \textbf{Core Constants Fully Solidified} (immutable):
+  \item \textbf{Core Constants Fully Solidified}:
     \begin{itemize}
-      \item All internal contract addresses (BTD, BTB, BRS, Treasury, Minter, Config, etc.)
-      \item IUSD inflation parameters (2\% annual, monthly growth factor)
-      \item BRS total supply cap (2.1 billion) and halving mechanism
-      \item Core calculation algorithms and precision configurations
+      \item All internal contract addresses stored in ConfigCore (immutable --- set in constructor, compiled into bytecode)
+      \item For upgradeable contracts, core references (e.g., ConfigCore address, ConfigGov address) are set once during proxy initialization and never modified by any function --- effectively immutable despite being stored in contract storage
+      \item IUSD inflation parameters (2\% annual, monthly growth factor) --- static constants in library
+      \item BRS total supply cap (2.1 billion) and halving mechanism --- static constants
+      \item Core calculation algorithms and precision configurations --- pure function libraries
     \end{itemize}
   \item \textbf{System Constants} (static constant):
     \begin{itemize}
@@ -638,11 +736,12 @@ System parameters and operations adjustable through on-chain governance include 
   \item Adding or removing mining pools
 \end{itemize}
 
-\textbf{Protocol Upgrades:}
+\textbf{Protocol Upgrades (UUPS):}
 \begin{itemize}
-  \item Upgrade operations for UUPS upgradeable contracts (must go through timelock)
-  \item Oracle contract address updates
-  \item Addition of new feature modules
+  \item Deploy new implementation contract and call \texttt{upgradeToAndCall()} on the proxy (must go through timelock in governance mode)
+  \item All 8 upgradeable contracts (ConfigGov, IdealUSDManager, PriceOracle, Treasury, Minter, InterestPool, FarmingPool, Governor) support this mechanism
+  \item Oracle contract address updates via ConfigGov
+  \item Permanent freeze of mature contracts via \texttt{renounceOwnership()} governance proposal
 \end{itemize}
 
 \textbf{Emergency Operations:}
@@ -686,39 +785,47 @@ All governance parameters can be adjusted through governance proposals themselve
 \section{Summary}
 Chapters 3--6 of the whitepaper propose a three-layer defense architecture of ``BTC collateral + bond adjustment + governance token backstop''. The formulas, parameters, and sequence given in this document are fully aligned: BTD minting and redemption follow the pegging principle of $1\,\text{BTD}=1\,\text{IUSD}$; BTB regulates debt interest rates through price intervals; BRS is generated through a four-year halving mining mechanism while using treasury buybacks to absorb long-term risks.
 
-\subsection{Core Advantages of Functional and Weak Governance}
+\subsection{Core Advantages of Functional Architecture, Weak Governance, and Progressive Decentralization}
 
-The system design follows two core principles to ensure long-term stability and predictability:
+The system design follows three core principles to ensure long-term stability, predictability, and a credible path toward decentralization:
 
 \textbf{Functional Architecture} achieves clear separation of algorithms and state:
 \begin{itemize}
   \item Core business logic (price calculation, collateral ratio calculation, IUSD adjustment, interest accumulation, etc.) encapsulated as pure function libraries
   \item Contract layer state minimized, storing only necessary addresses, balances, and accumulated values
   \item All calculation logic is deterministic, testable, and auditable
-  \item Gas efficiency optimization: immutable parameter reading costs only 3 gas (vs 2100 gas for storage), saving 99.86\%
+  \item Gas efficiency: static constants are compiled into bytecode (3 gas read); for upgradeable contracts, initialized-once parameters use storage (100 gas warm read), an acceptable tradeoff for upgradeability
 \end{itemize}
 
 \textbf{Weak Governance Principle} anchors system behavior to Bitcoin-like immutability:
 \begin{itemize}
-  \item \textbf{46\% are static constants}: Mathematical precision, time conversion, safety ceilings, interest rate parameters, etc., determined at compile time
-  \item \textbf{23\% of parameters fully solidified}: Core addresses, IUSD inflation rate, BRS total supply, etc., set as immutable at deployment, never changeable
-  \item \textbf{31\% of parameters are governable}: A small number of parameters like external system addresses, fees, deviation thresholds, rate caps retain governance capability, but are strictly constrained by security mechanisms (boundary checks, cooldown periods, whitelist restrictions, event logs)
-  \item \textbf{Unidirectional Tightening Principle}: Price deviation threshold can only be gradually tightened, not loosened, preventing governance from lowering security standards
+  \item \textbf{Static constants}: Mathematical precision, time conversion, safety ceilings, interest rate parameters, etc., determined at compile time --- permanently immutable
+  \item \textbf{Initialized-once parameters}: Core addresses (in ConfigCore: immutable; in upgradeable contracts: set during initialization and never modified) --- effectively immutable
+  \item \textbf{Governable parameters}: A small number of parameters like external system addresses, fees, deviation thresholds, rate caps retain governance capability, but are strictly constrained by security mechanisms (boundary checks, cooldown periods, whitelist restrictions, event logs)
   \item \textbf{Timelock Protection}: All governance operations (except emergency pause) must go through at least 2 days of timelock delay, giving the community sufficient reaction time
+\end{itemize}
+
+\textbf{Progressive Decentralization} provides a credible path from launch to full community control:
+\begin{itemize}
+  \item \textbf{UUPS Proxy Architecture}: 8 core contracts use proxy pattern, enabling seamless upgrades without changing user-facing addresses or disrupting stored state
+  \item \textbf{Three-Phase Lifecycle}: Administrator control at launch $\rightarrow$ governance transfer after stabilization $\rightarrow$ permanent freeze for battle-tested contracts
+  \item \textbf{Selective Immutability}: Not all contracts follow the same path --- mature, stable contracts can be permanently frozen while evolving components retain governance control
+  \item \textbf{Non-Upgradeable Anchors}: Token contracts (BTD, BTB, BRS), vault contracts (stBTD, stBTB), and the address registry (ConfigCore) are non-upgradeable by design, serving as immutable trust anchors
 \end{itemize}
 
 \subsection{Design Objectives Achieved}
 
-Through the combination of functional and weak governance, the system achieves:
+Through the combination of functional architecture, weak governance, and progressive decentralization, the system achieves:
 \begin{itemize}
   \item \textbf{Predictability}: Core economic parameters (2\% inflation rate, 2.1 billion BRS total supply) are as immutable as Bitcoin's 21 million cap
   \item \textbf{Transparency}: All algorithms presented in mathematical formula form, behavior is completely deterministic
-  \item \textbf{Security}: Attack vectors like price manipulation and inflation rate tampering are completely eliminated
-  \item \textbf{Minimal Trust}: Users need not trust that governors won't change core rules
-  \item \textbf{Emergency Flexibility}: Retains minimum necessary capability to handle extreme situations (limited parameter adjustment, contract upgrades, emergency pause)
+  \item \textbf{Security}: Attack vectors like price manipulation and inflation rate tampering are completely eliminated; upgrade authorization is strictly controlled
+  \item \textbf{Minimal Trust}: Users need not trust that governors won't change core rules; mature contracts can be permanently frozen to remove all trust assumptions
+  \item \textbf{Safe Iteration}: UUPS proxy pattern enables bug fixes and improvements without disrupting the system, critical during the early maturation period when undiscovered issues may surface
+  \item \textbf{Credible Decentralization}: The three-phase lifecycle provides a transparent, verifiable path from centralized launch to community governance to permanent immutability
 \end{itemize}
 
-This design philosophy ensures the BRS system maintains the same level of stability and trustworthiness as the Bitcoin protocol while providing decentralized stablecoin services. Through on-chain governance mechanisms, the community can democratically adjust necessary parameters and drive protocol evolution within strict constraints. Therefore, as long as implementations follow the mechanisms and parameters specified in this document, they can remain consistent with the whitepaper and expand into various implementation schemes in the future.
+This design philosophy ensures the BRS system maintains the same level of stability and trustworthiness as the Bitcoin protocol while providing decentralized stablecoin services. The progressive decentralization model acknowledges that complex smart contract systems benefit from a stabilization period, while committing to an irreversible path toward community control. Through on-chain governance mechanisms, the community can democratically adjust necessary parameters and drive protocol evolution within strict constraints. Therefore, as long as implementations follow the mechanisms and parameters specified in this document, they can remain consistent with the whitepaper and expand into various implementation schemes in the future.
 
 \appendix
 
@@ -806,8 +913,8 @@ The contract layer is only responsible for:
 \begin{itemize}
   \item \textbf{Testability}: Pure function libraries can be independently unit tested without contract deployment
   \item \textbf{Auditability}: Algorithm logic is clear, easy to manually review and formally verify
-  \item \textbf{Upgradability}: During contract upgrades, library function logic remains unchanged, reducing risk
-  \item \textbf{Gas Efficiency}: Inline functions avoid cross-contract calls, immutable parameters save 99.86\% reading cost
+  \item \textbf{Upgrade Safety}: During UUPS proxy upgrades, pure function library logic remains unchanged and deterministic, reducing upgrade risk --- only the contract layer (state management, permissions) changes
+  \item \textbf{Gas Efficiency}: Inline functions avoid cross-contract calls; static constants compiled into bytecode at 3 gas read cost
   \item \textbf{Composability}: Library functions can be reused across different contracts, maintaining consistency
 \end{itemize}
 
@@ -971,11 +1078,16 @@ MAX\_MANUAL\_DEVIATION & 5\% & Manual adjustment maximum deviation \\
 \end{longtable}
 \end{center}
 
-\subsection{Immutables (Immutable)}
+\subsection{Initialized-Once Parameters}
 
-Immutables are set through the constructor at contract deployment and never changeable afterward. Storage cost is only 3 gas (vs 2100 gas for storage).
+This category includes parameters that are set once and never modified. There are two subtypes:
 
-\subsubsection{Core Token Addresses (ConfigCore)}
+\begin{itemize}
+  \item \textbf{True Immutables} (in non-upgradeable contracts like ConfigCore): Set in the constructor and compiled into bytecode. Read cost: 3 gas.
+  \item \textbf{Proxy-Initialized} (in upgradeable contracts): Set during \texttt{initialize()} and stored in contract storage. No setter function exists to modify them after initialization. Read cost: 100 gas (warm) / 2,100 gas (cold). This is an acceptable tradeoff for the ability to upgrade contract logic via UUPS proxy.
+\end{itemize}
+
+\subsubsection{Core Token Addresses (ConfigCore --- True Immutable)}
 
 \begin{center}
 \begin{longtable}{p{4cm}p{10cm}}
@@ -994,7 +1106,7 @@ usdtAddr & USDT stablecoin address \\
 \end{longtable}
 \end{center}
 
-\subsubsection{Core Contract Addresses (ConfigCore)}
+\subsubsection{Core Contract Addresses (ConfigCore --- True Immutable)}
 
 \begin{center}
 \begin{longtable}{p{5cm}p{9cm}}
@@ -1002,16 +1114,16 @@ usdtAddr & USDT stablecoin address \\
 Parameter Name & Description \\
 \midrule
 \endhead
-treasuryAddr & Treasury contract address \\
-minterAddr & Minting and redemption contract address \\
-priceOracleAddr & Price oracle contract address \\
-idealUsdManagerAddr & IUSD manager address \\
-interestPoolAddr & Interest pool contract address \\
+treasuryAddr & Treasury proxy address (UUPS) \\
+minterAddr & Minting and redemption proxy address (UUPS) \\
+priceOracleAddr & Price oracle proxy address (UUPS) \\
+idealUsdManagerAddr & IUSD manager proxy address (UUPS) \\
+interestPoolAddr & Interest pool proxy address (UUPS) \\
 stakingRouterAddr & Staking router contract address \\
-farmingPoolAddr & Mining pool contract address \\
+farmingPoolAddr & Mining pool proxy address (UUPS) \\
 stBtdAddr & stBTD vault address \\
 stBtbAddr & stBTB vault address \\
-governorAddr & Governance contract address \\
+governorAddr & Governance proxy address (UUPS) \\
 twapOracleAddr & TWAP oracle address \\
 \midrule
 \multicolumn{2}{l}{\textit{DEX Pool Addresses}} \\
@@ -1022,15 +1134,22 @@ poolBrsBtd & BRS-BTD trading pair (for BRS price) \\
 \end{longtable}
 \end{center}
 
-\subsubsection{Mining Parameters (FarmingPool)}
+\textbf{Note:} For UUPS upgradeable contracts, ConfigCore stores the stable \textit{proxy} addresses. These addresses never change even when the underlying implementation is upgraded, ensuring all cross-contract references remain valid.
+
+\subsubsection{Proxy-Initialized Parameters (Upgradeable Contracts)}
+
+The following parameters are set once during \texttt{initialize()} in upgradeable contracts and have no setter functions:
 
 \begin{center}
-\begin{longtable}{p{4cm}p{10cm}}
+\begin{longtable}{p{4cm}p{3cm}p{7cm}}
 \toprule
-Parameter Name & Description \\
+Parameter Name & Contract & Description \\
 \midrule
 \endhead
-startTime & Mining start timestamp \\
+configCore & Treasury, Minter, InterestPool, FarmingPool, PriceOracle & ConfigCore address reference \\
+configGov & Minter, InterestPool, PriceOracle, IdealUSDManager & ConfigGov proxy address reference \\
+rewardToken & FarmingPool & BRS token address \\
+startTime & FarmingPool & Mining start timestamp \\
 \bottomrule
 \end{longtable}
 \end{center}
@@ -1201,25 +1320,27 @@ routerAddr & Uniswap V2 Router address (for buybacks) \\
 \toprule
 Category & Count & Percentage \\
 \midrule
-Static Constants (constant) & $\sim$43 & $\sim$46\% \\
-Immutables (immutable) & $\sim$22 & $\sim$23\% \\
-Governable Variables (governable) & $\sim$29 & $\sim$31\% \\
+Static Constants (constant) & $\sim$43 & $\sim$44\% \\
+Initialized-Once: True Immutable (ConfigCore) & $\sim$18 & $\sim$18\% \\
+Initialized-Once: Proxy-Initialized & $\sim$8 & $\sim$8\% \\
+Governable Variables (governable) & $\sim$29 & $\sim$30\% \\
 \midrule
-\textbf{Total} & \textbf{$\sim$94} & \textbf{100\%} \\
+\textbf{Total} & \textbf{$\sim$98} & \textbf{100\%} \\
 \bottomrule
 \end{tabular}
 \end{center}
 
 \textbf{Design Notes:}
 
-Approximately 69\% of system parameters are solidified at deployment (constant + immutable), with only 31\% retaining governance capability. This ``weak governance'' design ensures:
+Approximately 70\% of system parameters are solidified at deployment (constant + initialized-once), with only 30\% retaining governance capability. This ``weak governance'' design, combined with progressive decentralization, ensures:
 
 \begin{itemize}
   \item \textbf{Predictability}: Users and developers can rely on the system's core behavior not being changed by governance
-  \item \textbf{Immutability}: Key economic parameters are as unmodifiable as Bitcoin
-  \item \textbf{Minimal Trust}: Reduces trust assumptions about governors, lowers attack surface
-  \item \textbf{Gas Optimization}: Immutable parameter reading costs only 3 gas, saving 99.86\%
+  \item \textbf{Immutability}: Key economic parameters are as unmodifiable as Bitcoin; battle-tested contracts can be permanently frozen
+  \item \textbf{Minimal Trust}: Reduces trust assumptions about governors, lowers attack surface; frozen contracts require zero trust
+  \item \textbf{Safe Iteration}: UUPS proxy pattern enables bug fixes during the early maturation period without disrupting user-facing addresses or stored state
   \item \textbf{Emergency Flexibility}: Retains minimum necessary adjustment capability for extreme situations
+  \item \textbf{Credible Path}: Progressive decentralization provides a verifiable, irreversible path from admin control to community governance to permanent immutability
 \end{itemize}
 
 \end{document}
