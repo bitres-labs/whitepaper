@@ -13,11 +13,13 @@
 
 # Backup files
 *.bak
+*.bak.*
 *~
 
 # OS files
 .DS_Store
 Thumbs.db
+*:Zone.Identifier
 
 # Keep PDF (comment out if you don't want to track PDFs)
 # *.pdf
